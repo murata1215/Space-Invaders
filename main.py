@@ -31,6 +31,14 @@ ENEMY_BULLET_MAX = 3
 ENEMY_FIRE_MIN_INTERVAL = 0.6
 ENEMY_FIRE_MAX_INTERVAL = 1.4
 
+UFO_COLOR = (220, 140, 240)
+UFO_SIZE = (60, 20)
+UFO_SPEED = 140
+UFO_MIN_INTERVAL = 10.0
+UFO_MAX_INTERVAL = 15.0
+UFO_Y = 40
+UFO_BONUS = 100
+
 
 def build_enemy_rects():
     enemy_rects = []
@@ -62,6 +70,11 @@ def main():
     enemy_bullets = []
     enemy_fire_timer = 0.0
     next_enemy_fire = random.uniform(ENEMY_FIRE_MIN_INTERVAL, ENEMY_FIRE_MAX_INTERVAL)
+    score = 0
+    ufo_rect = None
+    ufo_timer = 0.0
+    next_ufo_spawn = random.uniform(UFO_MIN_INTERVAL, UFO_MAX_INTERVAL)
+    ufo_direction = 1
 
     running = True
     while running:
@@ -129,12 +142,33 @@ def main():
                 elif bullet.colliderect(player_rect):
                     running = False
 
+        if ufo_rect is None:
+            ufo_timer += dt
+            if ufo_timer >= next_ufo_spawn:
+                ufo_direction = random.choice([-1, 1])
+                start_x = -UFO_SIZE[0] if ufo_direction == 1 else SCREEN_WIDTH
+                ufo_rect = pygame.Rect(start_x, UFO_Y, *UFO_SIZE)
+                ufo_timer = 0.0
+                next_ufo_spawn = random.uniform(UFO_MIN_INTERVAL, UFO_MAX_INTERVAL)
+        else:
+            ufo_rect.x += int(UFO_SPEED * ufo_direction * dt)
+            if ufo_rect.right < 0 or ufo_rect.left > SCREEN_WIDTH:
+                ufo_rect = None
+
+        if bullet_rect is not None and ufo_rect is not None:
+            if bullet_rect.colliderect(ufo_rect):
+                score += UFO_BONUS
+                bullet_rect = None
+                ufo_rect = None
+
         screen.fill(BACKGROUND_COLOR)
         pygame.draw.rect(screen, PLAYER_COLOR, player_rect)
         for rect in enemy_rects:
             pygame.draw.rect(screen, ENEMY_COLOR, rect)
         if bullet_rect is not None:
             pygame.draw.rect(screen, BULLET_COLOR, bullet_rect)
+        if ufo_rect is not None:
+            pygame.draw.rect(screen, UFO_COLOR, ufo_rect)
         for bullet in enemy_bullets:
             pygame.draw.rect(screen, BULLET_COLOR, bullet)
 
