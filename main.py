@@ -187,11 +187,11 @@ def main():
                     running = False
                 elif game_state == "START" and event.key == pygame.K_RETURN:
                     game_state = "PLAYING"
-        elif game_state == "PLAYING" and event.key == pygame.K_SPACE:
-            if state["bullet_rect"] is None:
-                state["bullet_rect"] = pygame.Rect(
-                    state["player_rect"].centerx - BULLET_SIZE[0] // 2,
-                    state["player_rect"].top - BULLET_SIZE[1],
+                elif game_state == "PLAYING" and event.key == pygame.K_SPACE:
+                    if state["bullet_rect"] is None:
+                        state["bullet_rect"] = pygame.Rect(
+                            state["player_rect"].centerx - BULLET_SIZE[0] // 2,
+                            state["player_rect"].top - BULLET_SIZE[1],
                             *BULLET_SIZE,
                         )
                         play_sound(sounds["shoot"])
