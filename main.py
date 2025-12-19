@@ -135,12 +135,29 @@ def main():
             if state["enemy_rects"]:
                 leftmost = min(rect.left for rect in state["enemy_rects"])
                 rightmost = max(rect.right for rect in state["enemy_rects"])
-                if leftmost <= 0 or rightmost >= SCREEN_WIDTH:
+                dx = ENEMY_SPEED * state["enemy_direction"] * dt
+                edge_hit = (
+                    (state["enemy_direction"] < 0 and leftmost + dx <= 0)
+                    or (state["enemy_direction"] > 0 and rightmost + dx >= SCREEN_WIDTH)
+                )
+                if edge_hit:
                     state["enemy_direction"] *= -1
+                    dx = ENEMY_SPEED * state["enemy_direction"] * dt
                     for rect in state["enemy_rects"]:
                         rect.y += ENEMY_DROP
                 for rect in state["enemy_rects"]:
-                    rect.x += ENEMY_SPEED * state["enemy_direction"] * dt
+                    rect.x += dx
+                    rect.y = max(0, rect.y)
+                leftmost = min(rect.left for rect in state["enemy_rects"])
+                rightmost = max(rect.right for rect in state["enemy_rects"])
+                if leftmost < 0 or rightmost > SCREEN_WIDTH:
+                    shift = 0
+                    if leftmost < 0:
+                        shift = -leftmost
+                    elif rightmost > SCREEN_WIDTH:
+                        shift = SCREEN_WIDTH - rightmost
+                    for rect in state["enemy_rects"]:
+                        rect.x += shift
 
             if state["bullet_rect"] is not None:
                 hit_index = state["bullet_rect"].collidelist(state["enemy_rects"])
