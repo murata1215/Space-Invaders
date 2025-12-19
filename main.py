@@ -33,6 +33,10 @@ ENEMY_BULLET_SPEED = 6
 ENEMY_BULLET_MAX = 3
 ENEMY_FIRE_MIN_INTERVAL = 0.6
 ENEMY_FIRE_MAX_INTERVAL = 1.4
+STAGE_COUNT = 5
+STAGE_SPEED_BOOST = 0.25
+STAGE_FIRE_RATE_BOOST = 0.08
+STAGE_BANNER_DURATION = 1.0
 
 UFO_COLOR = (220, 140, 240)
 UFO_SIZE = (60, 20)
@@ -135,12 +139,22 @@ def main():
     ufo_channel = pygame.mixer.Channel(0) if mixer_ready else None
     ufo_loop_playing = False
 
+    def stage_enemy_speed(stage):
+        return ENEMY_SPEED * (1 + STAGE_SPEED_BOOST * (stage - 1))
+
+    def stage_fire_interval_range(stage):
+        reduction = max(0.0, 1 - STAGE_FIRE_RATE_BOOST * (stage - 1))
+        min_interval = max(0.2, ENEMY_FIRE_MIN_INTERVAL * reduction)
+        max_interval = max(min_interval + 0.2, ENEMY_FIRE_MAX_INTERVAL * reduction)
+        return min_interval, max_interval
+
     def reset_game():
         player = pygame.Rect(
             (SCREEN_WIDTH - PLAYER_SIZE[0]) // 2,
             SCREEN_HEIGHT - PLAYER_SIZE[1] - 40,
             *PLAYER_SIZE,
         )
+        min_fire, max_fire = stage_fire_interval_range(1)
         return {
             "player_rect": player,
             "enemy_rects": build_enemy_rects(),
@@ -148,10 +162,10 @@ def main():
             "bullet_rect": None,
             "enemy_bullets": [],
             "enemy_fire_timer": 0.0,
-            "next_enemy_fire": random.uniform(
-                ENEMY_FIRE_MIN_INTERVAL, ENEMY_FIRE_MAX_INTERVAL
-            ),
+            "next_enemy_fire": random.uniform(min_fire, max_fire),
             "score": 0,
+            "stage": 1,
+            "stage_banner_timer": 0.0,
             "ufo_rect": None,
             "ufo_timer": 0.0,
             "next_ufo_spawn": random.uniform(UFO_MIN_INTERVAL, UFO_MAX_INTERVAL),
@@ -173,11 +187,11 @@ def main():
                     running = False
                 elif game_state == "START" and event.key == pygame.K_RETURN:
                     game_state = "PLAYING"
-                elif game_state == "PLAYING" and event.key == pygame.K_SPACE:
-                    if state["bullet_rect"] is None:
-                        state["bullet_rect"] = pygame.Rect(
-                            state["player_rect"].centerx - BULLET_SIZE[0] // 2,
-                            state["player_rect"].top - BULLET_SIZE[1],
+        elif game_state == "PLAYING" and event.key == pygame.K_SPACE:
+            if state["bullet_rect"] is None:
+                state["bullet_rect"] = pygame.Rect(
+                    state["player_rect"].centerx - BULLET_SIZE[0] // 2,
+                    state["player_rect"].top - BULLET_SIZE[1],
                             *BULLET_SIZE,
                         )
                         play_sound(sounds["shoot"])
@@ -204,14 +218,15 @@ def main():
             if state["enemy_rects"]:
                 leftmost = min(rect.left for rect in state["enemy_rects"])
                 rightmost = max(rect.right for rect in state["enemy_rects"])
-                dx = ENEMY_SPEED * state["enemy_direction"] * dt
+                enemy_speed = stage_enemy_speed(state["stage"])
+                dx = enemy_speed * state["enemy_direction"] * dt
                 edge_hit = (
                     (state["enemy_direction"] < 0 and leftmost + dx <= 0)
                     or (state["enemy_direction"] > 0 and rightmost + dx >= SCREEN_WIDTH)
                 )
                 if edge_hit:
                     state["enemy_direction"] *= -1
-                    dx = ENEMY_SPEED * state["enemy_direction"] * dt
+                    dx = enemy_speed * state["enemy_direction"] * dt
                     for rect in state["enemy_rects"]:
                         rect.y += ENEMY_DROP
                 for rect in state["enemy_rects"]:
@@ -236,7 +251,27 @@ def main():
                     state["score"] += ENEMY_SCORE
                     play_sound(sounds["enemy"])
                     if not state["enemy_rects"]:
-                        game_state = "WIN"
+                        if state["stage"] >= STAGE_COUNT:
+                            game_state = "WIN"
+                        else:
+                            state["stage"] += 1
+                            state["enemy_rects"] = build_enemy_rects()
+                            state["enemy_direction"] = 1
+                            state["bullet_rect"] = None
+                            state["enemy_bullets"] = []
+                            state["enemy_fire_timer"] = 0.0
+                            min_fire, max_fire = stage_fire_interval_range(state["stage"])
+                            state["next_enemy_fire"] = random.uniform(min_fire, max_fire)
+                            state["ufo_rect"] = None
+                            state["ufo_timer"] = 0.0
+                            state["next_ufo_spawn"] = random.uniform(
+                                UFO_MIN_INTERVAL, UFO_MAX_INTERVAL
+                            )
+                            state["stage_banner_timer"] = STAGE_BANNER_DURATION
+                            state["player_rect"].centerx = SCREEN_WIDTH // 2
+                            if ufo_channel and ufo_loop_playing:
+                                ufo_channel.stop()
+                                ufo_loop_playing = False
             if state["enemy_rects"] and len(state["enemy_bullets"]) < ENEMY_BULLET_MAX:
                 state["enemy_fire_timer"] += dt
                 if state["enemy_fire_timer"] >= state["next_enemy_fire"]:
@@ -249,9 +284,8 @@ def main():
                         )
                     )
                     state["enemy_fire_timer"] = 0.0
-                    state["next_enemy_fire"] = random.uniform(
-                        ENEMY_FIRE_MIN_INTERVAL, ENEMY_FIRE_MAX_INTERVAL
-                    )
+                    min_fire, max_fire = stage_fire_interval_range(state["stage"])
+                    state["next_enemy_fire"] = random.uniform(min_fire, max_fire)
 
             if state["enemy_bullets"]:
                 for bullet in state["enemy_bullets"][:]:
@@ -299,6 +333,11 @@ def main():
                     ufo_channel.stop()
                     ufo_loop_playing = False
 
+            if state["stage_banner_timer"] > 0:
+                state["stage_banner_timer"] = max(
+                    0.0, state["stage_banner_timer"] - dt
+                )
+
         if game_state != "PLAYING" and ufo_loop_playing:
             if ufo_channel:
                 ufo_channel.stop()
@@ -322,8 +361,17 @@ def main():
             pygame.draw.rect(screen, BULLET_COLOR, bullet)
 
         if game_state == "PLAYING":
-            score_surface = font_small.render(f"Score: {state['score']}", True, (230, 230, 230))
+            score_surface = font_small.render(
+                f"Score: {state['score']}", True, (230, 230, 230)
+            )
             screen.blit(score_surface, (12, 10))
+            stage_surface = font_small.render(
+                f"Stage: {state['stage']}/{STAGE_COUNT}", True, (230, 230, 230)
+            )
+            stage_rect = stage_surface.get_rect(topright=(SCREEN_WIDTH - 12, 10))
+            screen.blit(stage_surface, stage_rect)
+            if state["stage_banner_timer"] > 0:
+                draw_centered_text(f"STAGE {state['stage']}", font_large, 260)
         elif game_state == "START":
             draw_centered_text("SPACE INVADERS", font_large, 200)
             draw_centered_text("Press ENTER to Start", font_medium, 280)
