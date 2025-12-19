@@ -1,4 +1,5 @@
 import sys
+import random
 
 import pygame
 
@@ -24,6 +25,11 @@ ENEMY_GAP_Y = 15
 ENEMY_TOP_MARGIN = 60
 ENEMY_SPEED = 120
 ENEMY_DROP = 20
+ENEMY_BULLET_SIZE = (6, 12)
+ENEMY_BULLET_SPEED = 6
+ENEMY_BULLET_MAX = 3
+ENEMY_FIRE_MIN_INTERVAL = 0.6
+ENEMY_FIRE_MAX_INTERVAL = 1.4
 
 
 def build_enemy_rects():
@@ -53,6 +59,9 @@ def main():
     enemy_rects = build_enemy_rects()
     enemy_direction = 1
     bullet_rect = None
+    enemy_bullets = []
+    enemy_fire_timer = 0.0
+    next_enemy_fire = random.uniform(ENEMY_FIRE_MIN_INTERVAL, ENEMY_FIRE_MAX_INTERVAL)
 
     running = True
     while running:
@@ -96,6 +105,29 @@ def main():
             if hit_index != -1:
                 enemy_rects.pop(hit_index)
                 bullet_rect = None
+        if enemy_rects and len(enemy_bullets) < ENEMY_BULLET_MAX:
+            enemy_fire_timer += dt
+            if enemy_fire_timer >= next_enemy_fire:
+                shooter = random.choice(enemy_rects)
+                enemy_bullets.append(
+                    pygame.Rect(
+                        shooter.centerx - ENEMY_BULLET_SIZE[0] // 2,
+                        shooter.bottom,
+                        *ENEMY_BULLET_SIZE,
+                    )
+                )
+                enemy_fire_timer = 0.0
+                next_enemy_fire = random.uniform(
+                    ENEMY_FIRE_MIN_INTERVAL, ENEMY_FIRE_MAX_INTERVAL
+                )
+
+        if enemy_bullets:
+            for bullet in enemy_bullets[:]:
+                bullet.y += ENEMY_BULLET_SPEED
+                if bullet.top > SCREEN_HEIGHT:
+                    enemy_bullets.remove(bullet)
+                elif bullet.colliderect(player_rect):
+                    running = False
 
         screen.fill(BACKGROUND_COLOR)
         pygame.draw.rect(screen, PLAYER_COLOR, player_rect)
@@ -103,6 +135,8 @@ def main():
             pygame.draw.rect(screen, ENEMY_COLOR, rect)
         if bullet_rect is not None:
             pygame.draw.rect(screen, BULLET_COLOR, bullet_rect)
+        for bullet in enemy_bullets:
+            pygame.draw.rect(screen, BULLET_COLOR, bullet)
 
         pygame.display.flip()
 
