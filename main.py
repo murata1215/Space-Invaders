@@ -22,6 +22,7 @@ ENEMY_ROWS = 3
 ENEMY_GAP_X = 20
 ENEMY_GAP_Y = 15
 ENEMY_TOP_MARGIN = 60
+ENEMY_SPEED = 2
 
 
 def build_enemy_rects():
@@ -49,6 +50,7 @@ def main():
         *PLAYER_SIZE,
     )
     enemy_rects = build_enemy_rects()
+    enemy_direction = 1
     bullet_rect = None
 
     running = True
@@ -75,6 +77,20 @@ def main():
         if bullet_rect is not None:
             bullet_rect.y -= BULLET_SPEED
             if bullet_rect.bottom < 0:
+                bullet_rect = None
+
+        if enemy_rects:
+            leftmost = min(rect.left for rect in enemy_rects)
+            rightmost = max(rect.right for rect in enemy_rects)
+            if leftmost <= 0 or rightmost >= SCREEN_WIDTH:
+                enemy_direction *= -1
+            for rect in enemy_rects:
+                rect.x += ENEMY_SPEED * enemy_direction
+
+        if bullet_rect is not None:
+            hit_index = bullet_rect.collidelist(enemy_rects)
+            if hit_index != -1:
+                enemy_rects.pop(hit_index)
                 bullet_rect = None
 
         screen.fill(BACKGROUND_COLOR)
