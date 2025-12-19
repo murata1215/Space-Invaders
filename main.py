@@ -1,5 +1,7 @@
 import sys
+import math
 import random
+from array import array
 
 import pygame
 
@@ -56,6 +58,11 @@ def build_enemy_rects():
 
 def main():
     pygame.init()
+    mixer_ready = True
+    try:
+        pygame.mixer.init(frequency=44100, size=-16, channels=1)
+    except pygame.error:
+        mixer_ready = False
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     pygame.display.set_caption("Space Invaders - Step 1")
     clock = pygame.time.Clock()
@@ -67,6 +74,34 @@ def main():
         surface = font.render(text, True, color)
         rect = surface.get_rect(center=(SCREEN_WIDTH // 2, y))
         screen.blit(surface, rect)
+
+    def make_sound(frequency, duration, volume, noise=False):
+        if not mixer_ready:
+            return None
+        sample_rate = 44100
+        samples = int(duration * sample_rate)
+        amplitude = 32767
+        buffer = array("h")
+        for i in range(samples):
+            if noise:
+                value = random.randint(-amplitude, amplitude)
+            else:
+                t = i / sample_rate
+                value = int(amplitude * math.sin(2 * math.pi * frequency * t))
+            buffer.append(value)
+        sound = pygame.mixer.Sound(buffer=buffer.tobytes())
+        sound.set_volume(volume)
+        return sound
+
+    def play_sound(sound):
+        if sound is not None:
+            sound.play()
+
+    sounds = {
+        "shoot": make_sound(880, 0.08, 0.3),
+        "enemy": make_sound(220, 0.1, 0.2, noise=True),
+        "ufo": make_sound(660, 0.14, 0.25),
+    }
 
     def reset_game():
         player = pygame.Rect(
@@ -112,6 +147,7 @@ def main():
                             state["player_rect"].top - BULLET_SIZE[1],
                             *BULLET_SIZE,
                         )
+                        play_sound(sounds["shoot"])
                 elif game_state in {"GAME_OVER", "WIN"} and event.key == pygame.K_r:
                     state = reset_game()
                     game_state = "PLAYING"
@@ -165,6 +201,7 @@ def main():
                     state["enemy_rects"].pop(hit_index)
                     state["bullet_rect"] = None
                     state["score"] += ENEMY_SCORE
+                    play_sound(sounds["enemy"])
                     if not state["enemy_rects"]:
                         game_state = "WIN"
             if state["enemy_rects"] and len(state["enemy_bullets"]) < ENEMY_BULLET_MAX:
@@ -216,6 +253,7 @@ def main():
                     state["score"] += UFO_BONUS
                     state["bullet_rect"] = None
                     state["ufo_rect"] = None
+                    play_sound(sounds["ufo"])
 
         screen.fill(BACKGROUND_COLOR)
         pygame.draw.rect(screen, PLAYER_COLOR, state["player_rect"])
