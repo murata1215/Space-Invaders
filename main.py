@@ -22,7 +22,8 @@ ENEMY_ROWS = 3
 ENEMY_GAP_X = 20
 ENEMY_GAP_Y = 15
 ENEMY_TOP_MARGIN = 60
-ENEMY_SPEED = 2
+ENEMY_SPEED = 120
+ENEMY_DROP = 20
 
 
 def build_enemy_rects():
@@ -55,6 +56,7 @@ def main():
 
     running = True
     while running:
+        dt = clock.tick(60) / 1000
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -84,8 +86,10 @@ def main():
             rightmost = max(rect.right for rect in enemy_rects)
             if leftmost <= 0 or rightmost >= SCREEN_WIDTH:
                 enemy_direction *= -1
+                for rect in enemy_rects:
+                    rect.y += ENEMY_DROP
             for rect in enemy_rects:
-                rect.x += ENEMY_SPEED * enemy_direction
+                rect.x += ENEMY_SPEED * enemy_direction * dt
 
         if bullet_rect is not None:
             hit_index = bullet_rect.collidelist(enemy_rects)
@@ -101,7 +105,6 @@ def main():
             pygame.draw.rect(screen, BULLET_COLOR, bullet_rect)
 
         pygame.display.flip()
-        clock.tick(60)
 
     pygame.quit()
     sys.exit()
