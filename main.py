@@ -8,9 +8,13 @@ SCREEN_HEIGHT = 600
 BACKGROUND_COLOR = (10, 10, 20)
 PLAYER_COLOR = (80, 200, 120)
 ENEMY_COLOR = (200, 80, 80)
+BULLET_COLOR = (240, 240, 120)
 
 PLAYER_SIZE = (60, 20)
 PLAYER_SPEED = 6
+
+BULLET_SIZE = (6, 12)
+BULLET_SPEED = 10
 
 ENEMY_SIZE = (40, 20)
 ENEMY_COLUMNS = 8
@@ -45,12 +49,20 @@ def main():
         *PLAYER_SIZE,
     )
     enemy_rects = build_enemy_rects()
+    bullet_rect = None
 
     running = True
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+                if bullet_rect is None:
+                    bullet_rect = pygame.Rect(
+                        player_rect.centerx - BULLET_SIZE[0] // 2,
+                        player_rect.top - BULLET_SIZE[1],
+                        *BULLET_SIZE,
+                    )
 
         keys = pygame.key.get_pressed()
         if keys[pygame.K_LEFT]:
@@ -60,10 +72,17 @@ def main():
 
         player_rect.x = max(0, min(player_rect.x, SCREEN_WIDTH - player_rect.width))
 
+        if bullet_rect is not None:
+            bullet_rect.y -= BULLET_SPEED
+            if bullet_rect.bottom < 0:
+                bullet_rect = None
+
         screen.fill(BACKGROUND_COLOR)
         pygame.draw.rect(screen, PLAYER_COLOR, player_rect)
         for rect in enemy_rects:
             pygame.draw.rect(screen, ENEMY_COLOR, rect)
+        if bullet_rect is not None:
+            pygame.draw.rect(screen, BULLET_COLOR, bullet_rect)
 
         pygame.display.flip()
         clock.tick(60)
