@@ -10,7 +10,13 @@ SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
 BACKGROUND_COLOR = (10, 10, 20)
 PLAYER_COLOR = (80, 200, 120)
-ENEMY_COLOR = (200, 80, 80)
+STAGE_ENEMY_COLORS = {
+    1: (220, 60, 60),
+    2: (80, 140, 240),
+    3: (80, 200, 120),
+    4: (160, 100, 60),
+    5: (160, 90, 200),
+}
 BULLET_COLOR = (240, 240, 120)
 
 PLAYER_SIZE = (60, 20)
@@ -147,6 +153,9 @@ def main():
         min_interval = max(0.2, ENEMY_FIRE_MIN_INTERVAL * reduction)
         max_interval = max(min_interval + 0.2, ENEMY_FIRE_MAX_INTERVAL * reduction)
         return min_interval, max_interval
+
+    def stage_enemy_color(stage):
+        return STAGE_ENEMY_COLORS.get(stage, STAGE_ENEMY_COLORS[1])
 
     def reset_game():
         player = pygame.Rect(
@@ -351,8 +360,9 @@ def main():
 
         screen.fill(BACKGROUND_COLOR)
         pygame.draw.rect(screen, PLAYER_COLOR, state["player_rect"])
+        enemy_color = stage_enemy_color(state["stage"])
         for rect in state["enemy_rects"]:
-            pygame.draw.rect(screen, ENEMY_COLOR, rect)
+            pygame.draw.rect(screen, enemy_color, rect)
         if state["bullet_rect"] is not None:
             pygame.draw.rect(screen, BULLET_COLOR, state["bullet_rect"])
         if state["ufo_rect"] is not None:
