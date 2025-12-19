@@ -1,0 +1,76 @@
+import sys
+
+import pygame
+
+
+SCREEN_WIDTH = 800
+SCREEN_HEIGHT = 600
+BACKGROUND_COLOR = (10, 10, 20)
+PLAYER_COLOR = (80, 200, 120)
+ENEMY_COLOR = (200, 80, 80)
+
+PLAYER_SIZE = (60, 20)
+PLAYER_SPEED = 6
+
+ENEMY_SIZE = (40, 20)
+ENEMY_COLUMNS = 8
+ENEMY_ROWS = 3
+ENEMY_GAP_X = 20
+ENEMY_GAP_Y = 15
+ENEMY_TOP_MARGIN = 60
+
+
+def build_enemy_rects():
+    enemy_rects = []
+    total_width = ENEMY_COLUMNS * ENEMY_SIZE[0] + (ENEMY_COLUMNS - 1) * ENEMY_GAP_X
+    start_x = (SCREEN_WIDTH - total_width) // 2
+
+    for row in range(ENEMY_ROWS):
+        for col in range(ENEMY_COLUMNS):
+            x = start_x + col * (ENEMY_SIZE[0] + ENEMY_GAP_X)
+            y = ENEMY_TOP_MARGIN + row * (ENEMY_SIZE[1] + ENEMY_GAP_Y)
+            enemy_rects.append(pygame.Rect(x, y, *ENEMY_SIZE))
+    return enemy_rects
+
+
+def main():
+    pygame.init()
+    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+    pygame.display.set_caption("Space Invaders - Step 1")
+    clock = pygame.time.Clock()
+
+    player_rect = pygame.Rect(
+        (SCREEN_WIDTH - PLAYER_SIZE[0]) // 2,
+        SCREEN_HEIGHT - PLAYER_SIZE[1] - 40,
+        *PLAYER_SIZE,
+    )
+    enemy_rects = build_enemy_rects()
+
+    running = True
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_LEFT]:
+            player_rect.x -= PLAYER_SPEED
+        if keys[pygame.K_RIGHT]:
+            player_rect.x += PLAYER_SPEED
+
+        player_rect.x = max(0, min(player_rect.x, SCREEN_WIDTH - player_rect.width))
+
+        screen.fill(BACKGROUND_COLOR)
+        pygame.draw.rect(screen, PLAYER_COLOR, player_rect)
+        for rect in enemy_rects:
+            pygame.draw.rect(screen, ENEMY_COLOR, rect)
+
+        pygame.display.flip()
+        clock.tick(60)
+
+    pygame.quit()
+    sys.exit()
+
+
+if __name__ == "__main__":
+    main()
