@@ -63,6 +63,9 @@ def main():
         pygame.mixer.init(frequency=44100, size=-16, channels=1)
     except pygame.error:
         mixer_ready = False
+    if mixer_ready:
+        pygame.mixer.set_num_channels(8)
+        pygame.mixer.set_reserved(1)
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     pygame.display.set_caption("Space Invaders - Step 1")
     clock = pygame.time.Clock()
@@ -82,16 +85,38 @@ def main():
         samples = int(duration * sample_rate)
         amplitude = 32767
         buffer = array("h")
-        for i in range(samples):
-            if noise:
-                value = random.randint(-amplitude, amplitude)
-            else:
-                t = i / sample_rate
-                value = int(amplitude * math.sin(2 * math.pi * frequency * t))
-            buffer.append(value)
-        sound = pygame.mixer.Sound(buffer=buffer.tobytes())
-        sound.set_volume(volume)
-        return sound
+        try:
+            for i in range(samples):
+                if noise:
+                    value = random.randint(-amplitude, amplitude)
+                else:
+                    t = i / sample_rate
+                    value = int(amplitude * math.sin(2 * math.pi * frequency * t))
+                buffer.append(value)
+            sound = pygame.mixer.Sound(buffer=buffer.tobytes())
+            sound.set_volume(volume)
+            return sound
+        except pygame.error:
+            return None
+
+    def make_tone_sequence(segments, volume):
+        if not mixer_ready:
+            return None
+        sample_rate = 44100
+        amplitude = 32767
+        buffer = array("h")
+        try:
+            for frequency, duration in segments:
+                samples = int(duration * sample_rate)
+                for i in range(samples):
+                    t = i / sample_rate
+                    value = int(amplitude * math.sin(2 * math.pi * frequency * t))
+                    buffer.append(value)
+            sound = pygame.mixer.Sound(buffer=buffer.tobytes())
+            sound.set_volume(volume)
+            return sound
+        except pygame.error:
+            return None
 
     def play_sound(sound):
         if sound is not None:
@@ -101,7 +126,14 @@ def main():
         "shoot": make_sound(880, 0.08, 0.3),
         "enemy": make_sound(220, 0.1, 0.2, noise=True),
         "ufo": make_sound(660, 0.14, 0.25),
+        "ufo_loop": make_tone_sequence(
+            [(780, 0.12), (540, 0.12), (780, 0.12), (540, 0.12)], 0.25
+        ),
+        "win": make_tone_sequence([(880, 0.12), (1180, 0.12)], 0.3),
+        "game_over": make_tone_sequence([(320, 0.14), (220, 0.16)], 0.3),
     }
+    ufo_channel = pygame.mixer.Channel(0) if mixer_ready else None
+    ufo_loop_playing = False
 
     def reset_game():
         player = pygame.Rect(
@@ -131,6 +163,7 @@ def main():
 
     running = True
     while running:
+        previous_game_state = game_state
         dt = clock.tick(60) / 1000
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -228,6 +261,7 @@ def main():
                     elif bullet.colliderect(state["player_rect"]):
                         game_state = "GAME_OVER"
 
+            ufo_was_visible = state["ufo_rect"] is not None
             if state["ufo_rect"] is None:
                 state["ufo_timer"] += dt
                 if state["ufo_timer"] >= state["next_ufo_spawn"]:
@@ -254,6 +288,27 @@ def main():
                     state["bullet_rect"] = None
                     state["ufo_rect"] = None
                     play_sound(sounds["ufo"])
+
+            ufo_is_visible = state["ufo_rect"] is not None
+            if ufo_is_visible and not ufo_was_visible and sounds["ufo_loop"]:
+                if ufo_channel and not ufo_loop_playing:
+                    ufo_channel.play(sounds["ufo_loop"], loops=-1)
+                    ufo_loop_playing = True
+            if (not ufo_is_visible and ufo_was_visible) or game_state != "PLAYING":
+                if ufo_channel and ufo_loop_playing:
+                    ufo_channel.stop()
+                    ufo_loop_playing = False
+
+        if game_state != "PLAYING" and ufo_loop_playing:
+            if ufo_channel:
+                ufo_channel.stop()
+            ufo_loop_playing = False
+
+        if game_state != previous_game_state:
+            if game_state == "WIN":
+                play_sound(sounds["win"])
+            elif game_state == "GAME_OVER":
+                play_sound(sounds["game_over"])
 
         screen.fill(BACKGROUND_COLOR)
         pygame.draw.rect(screen, PLAYER_COLOR, state["player_rect"])
