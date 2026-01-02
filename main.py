@@ -283,6 +283,7 @@ def main():
         ),
         "win": make_tone_sequence([(880, 0.12), (1180, 0.12)], 0.3),
         "game_over": make_tone_sequence([(320, 0.14), (220, 0.16)], 0.3),
+        "player_hit": make_tone_sequence([(440, 0.08), (220, 0.1), (110, 0.15)], 0.4),
     }
     ufo_channel = pygame.mixer.Channel(0) if mixer_ready else None
     ufo_loop_playing = False
@@ -451,6 +452,7 @@ def main():
                     elif bullet.colliderect(state["player_rect"]):
                         state["lives"] -= 1
                         state["enemy_bullets"].remove(bullet)
+                        play_sound(sounds["player_hit"])
                         if state["lives"] <= 0:
                             game_state = "GAME_OVER"
                         else:
