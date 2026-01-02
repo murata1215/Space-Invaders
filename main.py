@@ -10,6 +10,7 @@ SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
 BACKGROUND_COLOR = (10, 10, 20)
 PLAYER_COLOR = (80, 200, 120)
+PLAYER_ACCENT_COLOR = (60, 160, 90)
 STAGE_ENEMY_COLORS = {
     1: (220, 60, 60),
     2: (80, 140, 240),
@@ -17,24 +18,33 @@ STAGE_ENEMY_COLORS = {
     4: (160, 100, 60),
     5: (160, 90, 200),
 }
-BULLET_COLOR = (240, 240, 120)
+STAGE_ENEMY_ACCENT_COLORS = {
+    1: (180, 40, 40),
+    2: (60, 100, 200),
+    3: (60, 160, 90),
+    4: (120, 70, 40),
+    5: (120, 60, 160),
+}
+BULLET_COLOR = (255, 220, 80)
+BULLET_GLOW_COLOR = (255, 255, 150)
+ENEMY_BULLET_COLOR = (255, 100, 100)
 
-PLAYER_SIZE = (60, 20)
+PLAYER_SIZE = (60, 30)
 PLAYER_SPEED = 6
 
-BULLET_SIZE = (6, 12)
+BULLET_SIZE = (4, 16)
 BULLET_SPEED = 10
 ENEMY_SCORE = 10
 
-ENEMY_SIZE = (40, 20)
+ENEMY_SIZE = (44, 32)
 ENEMY_COLUMNS = 8
 ENEMY_ROWS = 3
-ENEMY_GAP_X = 20
-ENEMY_GAP_Y = 15
-ENEMY_TOP_MARGIN = 60
+ENEMY_GAP_X = 16
+ENEMY_GAP_Y = 12
+ENEMY_TOP_MARGIN = 70
 ENEMY_SPEED = 120
 ENEMY_DROP = 20
-ENEMY_BULLET_SIZE = (6, 12)
+ENEMY_BULLET_SIZE = (4, 14)
 ENEMY_BULLET_SPEED = 6
 ENEMY_BULLET_MAX = 3
 ENEMY_FIRE_MIN_INTERVAL = 0.6
@@ -45,12 +55,16 @@ STAGE_FIRE_RATE_BOOST = 0.08
 STAGE_BANNER_DURATION = 1.0
 
 UFO_COLOR = (220, 140, 240)
-UFO_SIZE = (60, 20)
+UFO_ACCENT_COLOR = (180, 100, 200)
+UFO_SIZE = (60, 24)
 UFO_SPEED = 140
 UFO_MIN_INTERVAL = 10.0
 UFO_MAX_INTERVAL = 15.0
 UFO_Y = 40
 UFO_BONUS = 100
+
+PLAYER_LIVES = 3
+RESPAWN_DELAY = 1.5
 
 
 def build_enemy_rects():
@@ -64,6 +78,134 @@ def build_enemy_rects():
             y = ENEMY_TOP_MARGIN + row * (ENEMY_SIZE[1] + ENEMY_GAP_Y)
             enemy_rects.append(pygame.Rect(x, y, *ENEMY_SIZE))
     return enemy_rects
+
+
+def draw_cannon(surface, rect, color, accent_color):
+    """砲台を描画（クラシックなスペースインベーダー風）"""
+    x, y, w, h = rect.x, rect.y, rect.width, rect.height
+
+    # 砲台のベース部分
+    base_rect = pygame.Rect(x, y + h * 0.5, w, h * 0.5)
+    pygame.draw.rect(surface, color, base_rect)
+
+    # 砲台の中央部分（少し高い）
+    mid_width = w * 0.6
+    mid_rect = pygame.Rect(x + (w - mid_width) / 2, y + h * 0.3, mid_width, h * 0.4)
+    pygame.draw.rect(surface, color, mid_rect)
+
+    # 砲身（上部の細い部分）
+    barrel_width = w * 0.15
+    barrel_rect = pygame.Rect(x + (w - barrel_width) / 2, y, barrel_width, h * 0.4)
+    pygame.draw.rect(surface, color, barrel_rect)
+
+    # アクセントライン
+    pygame.draw.line(surface, accent_color, (x + 4, y + h - 4), (x + w - 4, y + h - 4), 2)
+
+
+def draw_crab_enemy(surface, rect, color, accent_color, frame):
+    """カニ風の敵を描画（アニメーション付き）"""
+    x, y, w, h = rect.x, rect.y, rect.width, rect.height
+
+    # 胴体（楕円）
+    body_rect = pygame.Rect(x + w * 0.15, y + h * 0.25, w * 0.7, h * 0.5)
+    pygame.draw.ellipse(surface, color, body_rect)
+
+    # 目（2つの円）
+    eye_radius = int(w * 0.1)
+    eye_y = int(y + h * 0.35)
+    pygame.draw.circle(surface, (255, 255, 255), (int(x + w * 0.35), eye_y), eye_radius)
+    pygame.draw.circle(surface, (255, 255, 255), (int(x + w * 0.65), eye_y), eye_radius)
+    pygame.draw.circle(surface, (0, 0, 0), (int(x + w * 0.35), eye_y), eye_radius // 2)
+    pygame.draw.circle(surface, (0, 0, 0), (int(x + w * 0.65), eye_y), eye_radius // 2)
+
+    # ハサミ（左右）- アニメーションで動く
+    claw_offset = 2 if frame % 2 == 0 else -2
+    # 左ハサミ
+    left_claw = [
+        (x + w * 0.1, y + h * 0.4),
+        (x - w * 0.05, y + h * 0.3 + claw_offset),
+        (x + w * 0.05, y + h * 0.2 + claw_offset),
+        (x + w * 0.15, y + h * 0.35),
+    ]
+    pygame.draw.polygon(surface, color, left_claw)
+    # 右ハサミ
+    right_claw = [
+        (x + w * 0.9, y + h * 0.4),
+        (x + w * 1.05, y + h * 0.3 - claw_offset),
+        (x + w * 0.95, y + h * 0.2 - claw_offset),
+        (x + w * 0.85, y + h * 0.35),
+    ]
+    pygame.draw.polygon(surface, color, right_claw)
+
+    # 脚（6本）- アニメーションで交互に動く
+    leg_y_base = y + h * 0.7
+    for i in range(3):
+        leg_offset = 3 if (frame + i) % 2 == 0 else -3
+        # 左脚
+        leg_x_left = x + w * (0.25 + i * 0.15)
+        pygame.draw.line(surface, accent_color,
+                        (leg_x_left, leg_y_base - 5),
+                        (leg_x_left - 5, y + h + leg_offset), 3)
+        # 右脚
+        leg_x_right = x + w * (0.75 - i * 0.15)
+        pygame.draw.line(surface, accent_color,
+                        (leg_x_right, leg_y_base - 5),
+                        (leg_x_right + 5, y + h - leg_offset), 3)
+
+
+def draw_ufo(surface, rect, color, accent_color):
+    """UFOを描画"""
+    x, y, w, h = rect.x, rect.y, rect.width, rect.height
+
+    # ドーム部分（上部の半円）
+    dome_rect = pygame.Rect(x + w * 0.25, y, w * 0.5, h * 0.6)
+    pygame.draw.ellipse(surface, accent_color, dome_rect)
+
+    # 本体（楕円）
+    body_rect = pygame.Rect(x, y + h * 0.35, w, h * 0.5)
+    pygame.draw.ellipse(surface, color, body_rect)
+
+    # ライト（下部に3つの点滅）
+    light_y = int(y + h * 0.7)
+    for i, lx in enumerate([0.25, 0.5, 0.75]):
+        light_color = (255, 255, 100) if (pygame.time.get_ticks() // 150 + i) % 2 == 0 else (100, 100, 50)
+        pygame.draw.circle(surface, light_color, (int(x + w * lx), light_y), 3)
+
+
+def draw_player_bullet(surface, rect):
+    """プレイヤーの弾を描画（光る効果付き）"""
+    x, y, w, h = rect.x, rect.y, rect.width, rect.height
+    # グロー効果
+    glow_rect = pygame.Rect(x - 2, y - 2, w + 4, h + 4)
+    pygame.draw.ellipse(surface, BULLET_GLOW_COLOR, glow_rect)
+    # 弾本体
+    pygame.draw.rect(surface, BULLET_COLOR, rect)
+
+
+def draw_enemy_bullet(surface, rect):
+    """敵の弾を描画（ジグザグ）"""
+    x, y, w, h = rect.x, rect.y, rect.width, rect.height
+    points = [
+        (x + w / 2, y),
+        (x + w, y + h * 0.25),
+        (x, y + h * 0.5),
+        (x + w, y + h * 0.75),
+        (x + w / 2, y + h),
+    ]
+    pygame.draw.lines(surface, ENEMY_BULLET_COLOR, False, points, 3)
+
+
+def draw_lives(surface, lives, x, y, size=20):
+    """残機を砲台アイコンで表示"""
+    for i in range(lives):
+        mini_rect = pygame.Rect(x + i * (size + 10), y, size, size * 0.6)
+        # ミニ砲台を描画
+        pygame.draw.rect(surface, PLAYER_COLOR,
+                        pygame.Rect(mini_rect.x, mini_rect.y + mini_rect.height * 0.5,
+                                   mini_rect.width, mini_rect.height * 0.5))
+        pygame.draw.rect(surface, PLAYER_COLOR,
+                        pygame.Rect(mini_rect.x + mini_rect.width * 0.35, mini_rect.y,
+                                   mini_rect.width * 0.3, mini_rect.height * 0.6))
 
 
 def main():
@@ -179,6 +321,11 @@ def main():
             "ufo_timer": 0.0,
             "next_ufo_spawn": random.uniform(UFO_MIN_INTERVAL, UFO_MAX_INTERVAL),
             "ufo_direction": 1,
+            "lives": PLAYER_LIVES,
+            "respawn_timer": 0.0,
+            "player_visible": True,
+            "animation_frame": 0,
+            "animation_timer": 0.0,
         }
 
     game_state = "START"
@@ -296,13 +443,35 @@ def main():
                     min_fire, max_fire = stage_fire_interval_range(state["stage"])
                     state["next_enemy_fire"] = random.uniform(min_fire, max_fire)
 
-            if state["enemy_bullets"]:
+            if state["enemy_bullets"] and state["player_visible"]:
                 for bullet in state["enemy_bullets"][:]:
                     bullet.y += ENEMY_BULLET_SPEED
                     if bullet.top > SCREEN_HEIGHT:
                         state["enemy_bullets"].remove(bullet)
                     elif bullet.colliderect(state["player_rect"]):
-                        game_state = "GAME_OVER"
+                        state["lives"] -= 1
+                        state["enemy_bullets"].remove(bullet)
+                        if state["lives"] <= 0:
+                            game_state = "GAME_OVER"
+                        else:
+                            state["player_visible"] = False
+                            state["respawn_timer"] = RESPAWN_DELAY
+                            state["bullet_rect"] = None
+                        break
+
+            # リスポーン処理
+            if not state["player_visible"]:
+                state["respawn_timer"] -= dt
+                if state["respawn_timer"] <= 0:
+                    state["player_visible"] = True
+                    state["player_rect"].centerx = SCREEN_WIDTH // 2
+                    state["enemy_bullets"] = []
+
+            # アニメーションフレーム更新
+            state["animation_timer"] += dt
+            if state["animation_timer"] >= 0.3:
+                state["animation_frame"] += 1
+                state["animation_timer"] = 0.0
 
             ufo_was_visible = state["ufo_rect"] is not None
             if state["ufo_rect"] is None:
@@ -359,16 +528,30 @@ def main():
                 play_sound(sounds["game_over"])
 
         screen.fill(BACKGROUND_COLOR)
-        pygame.draw.rect(screen, PLAYER_COLOR, state["player_rect"])
+
+        # プレイヤーの描画（リスポーン中は点滅）
+        if state["player_visible"]:
+            draw_cannon(screen, state["player_rect"], PLAYER_COLOR, PLAYER_ACCENT_COLOR)
+        elif int(state["respawn_timer"] * 6) % 2 == 0:
+            draw_cannon(screen, state["player_rect"], (80, 80, 80), (60, 60, 60))
+
+        # 敵の描画
         enemy_color = stage_enemy_color(state["stage"])
+        enemy_accent = STAGE_ENEMY_ACCENT_COLORS.get(state["stage"], STAGE_ENEMY_ACCENT_COLORS[1])
         for rect in state["enemy_rects"]:
-            pygame.draw.rect(screen, enemy_color, rect)
+            draw_crab_enemy(screen, rect, enemy_color, enemy_accent, state["animation_frame"])
+
+        # プレイヤーの弾
         if state["bullet_rect"] is not None:
-            pygame.draw.rect(screen, BULLET_COLOR, state["bullet_rect"])
+            draw_player_bullet(screen, state["bullet_rect"])
+
+        # UFO
         if state["ufo_rect"] is not None:
-            pygame.draw.rect(screen, UFO_COLOR, state["ufo_rect"])
+            draw_ufo(screen, state["ufo_rect"], UFO_COLOR, UFO_ACCENT_COLOR)
+
+        # 敵の弾
         for bullet in state["enemy_bullets"]:
-            pygame.draw.rect(screen, BULLET_COLOR, bullet)
+            draw_enemy_bullet(screen, bullet)
 
         if game_state == "PLAYING":
             score_surface = font_small.render(
@@ -380,6 +563,10 @@ def main():
             )
             stage_rect = stage_surface.get_rect(topright=(SCREEN_WIDTH - 12, 10))
             screen.blit(stage_surface, stage_rect)
+
+            # 残機表示
+            draw_lives(screen, state["lives"], SCREEN_WIDTH // 2 - 50, 8)
+
             if state["stage_banner_timer"] > 0:
                 draw_centered_text(f"STAGE {state['stage']}", font_large, 260)
         elif game_state == "START":
